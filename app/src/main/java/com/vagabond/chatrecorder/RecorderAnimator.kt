@@ -4,7 +4,7 @@ import android.animation.Animator
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
-import android.content.Context
+import android.app.Activity
 import android.content.res.Resources
 import android.os.CountDownTimer
 import android.support.v4.view.GestureDetectorCompat
@@ -18,16 +18,17 @@ import android.support.constraint.ConstraintLayout
 import android.support.constraint.ConstraintSet
 import android.view.ViewConfiguration
 import android.widget.RelativeLayout
-import java.util.*
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 
-
-class RecorderAnimator(val context: Context, var hideView: View? = null, val recordView: View) :
+//remember to take permission beforehand
+class RecorderAnimator(val activity: Activity, var hideView: View? = null, val recordView: View) :
         GestureDetector.OnGestureListener {
 
     private val MAX_RECORD_DUR = 30*60*1000L
     private val TOTAL_WIDTH = Resources.getSystem().getDisplayMetrics().widthPixels;
+
+    private var elapsedRecordedTime:Long = 0
 
     private var isAnimationAllowed = false
     private lateinit var timerTxt: TextView
@@ -67,7 +68,7 @@ class RecorderAnimator(val context: Context, var hideView: View? = null, val rec
         if(!isAnimationAllowed)
             return false
         if(velocityX > 20 && velocityY< 10){
-            cancelEverything()
+//            cancelEverything()
             endRecording(true)
         }
         return true
@@ -98,7 +99,7 @@ class RecorderAnimator(val context: Context, var hideView: View? = null, val rec
         gradientView = recordView.findViewById(R.id.gradient_view)
         seperatorView = recordView.findViewById(R.id.mic_timer_seperator)
 
-        gestureDetector = GestureDetectorCompat(context, this)
+        gestureDetector = GestureDetectorCompat(activity, this)
         gestureDetector.setIsLongpressEnabled(false)
         recordMicRightMargin = (recordMic.layoutParams as ConstraintLayout.LayoutParams).marginEnd
 //    recordMic.post({
@@ -118,7 +119,7 @@ class RecorderAnimator(val context: Context, var hideView: View? = null, val rec
         isAnimationAllowed = false
         makeHoldingMicBig(false)
         slideMicOnDrag(TOTAL_WIDTH.toFloat() - recordMicRightMargin)
-        closeRecordView(true)
+//        closeRecordView(true)
     }
 
 
@@ -130,7 +131,7 @@ class RecorderAnimator(val context: Context, var hideView: View? = null, val rec
         when (event.action) {
 //            MotionEvent.ACTION_DOWN-> makeHoldingMicBig(true)
             MotionEvent.ACTION_UP -> {
-                if (isAnimationAllowed){cancelEverything() }
+//                if (isAnimationAllowed){cancelEverything() }
                 endRecording(false)
             }
             else -> return gestureDetector.onTouchEvent(event)
@@ -140,6 +141,28 @@ class RecorderAnimator(val context: Context, var hideView: View? = null, val rec
     }
 
     private fun endRecording(isCancelled:Boolean){
+        val recordedFilePath = try{stopRecording()} catch (e:Exception){
+            e.printStackTrace()
+            null
+        }
+        if(isAnimationAllowed)cancelEverything()
+        if(isCancelled) closeRecordView(false)
+        else{
+            if(elapsedRecordedTime < 1000){
+                closeRecordView(false, false)
+            }else{
+                if(recordedFilePath != null) {
+                    startPlaying(recordedFilePath)
+                    closeRecordView(true)
+
+                }else{
+                    closeRecordView(false, false)
+                }
+
+            }
+        }
+
+
         recordCountdownTimer?.cancel()
         recordCountdownTimer = null
     }
@@ -159,7 +182,7 @@ class RecorderAnimator(val context: Context, var hideView: View? = null, val rec
         recordMic.setLayoutParams(params)
 
         if(slideTxt.x <= seperatorView.x &&  isAnimationAllowed){
-            cancelEverything()
+//            cancelEverything()
             endRecording(true)
         }
 
@@ -222,18 +245,20 @@ class RecorderAnimator(val context: Context, var hideView: View? = null, val rec
         recordCountdownTimer = object : CountDownTimer(MAX_RECORD_DUR,1000L ){
             override fun onFinish() {
                 if(isAnimationAllowed) {
-                    cancelEverything()
+//                    cancelEverything()
                     endRecording(true)
                 }
                 recordCountdownTimer = null
             }
 
             override fun onTick(millisUntilFinished: Long) {
-                onRecordingTimepass(MAX_RECORD_DUR - millisUntilFinished)
+                elapsedRecordedTime = MAX_RECORD_DUR - millisUntilFinished
+                onRecordingTimepass(elapsedRecordedTime)
             }
 
         }
         recordCountdownTimer?.start()
+        com.vagabond.chatrecorder.startRecording(activity)
     }
 
     private fun onRecordingTimepass(timePassInMillis: Long) {
@@ -254,7 +279,7 @@ class RecorderAnimator(val context: Context, var hideView: View? = null, val rec
         animateMicAnimator?.start()
     }
 
-    private fun closeRecordView(isRecordingSuccess:Boolean) {
+    private fun closeRecordView(isRecordingSuccess:Boolean, isCncelledByUser:Boolean = true) {
 
 
 
