@@ -22,7 +22,7 @@ import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 
 //remember to take permission beforehand
-class RecorderAnimator(val activity: Activity, var hideView: View? = null, val recordView: View) :
+class RecorderAnimator(val activity: Activity,  val recordView: View, val callback:(filepath:String?) -> Unit) :
         GestureDetector.OnGestureListener {
 
     private val MAX_RECORD_DUR = 30*60*1000L
@@ -162,7 +162,7 @@ class RecorderAnimator(val activity: Activity, var hideView: View? = null, val r
             }
         }
 
-
+        callback.invoke(recordedFilePath)
         recordCountdownTimer?.cancel()
         recordCountdownTimer = null
     }
